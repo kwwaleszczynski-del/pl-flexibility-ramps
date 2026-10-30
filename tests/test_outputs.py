@@ -4,6 +4,9 @@ from datetime import date
 import numpy as np
 import pandas as pd
 import pytest
+from pse_opendata.cache import MonthCache
+from pse_opendata.catalog import get_legacy_report, get_report
+from pse_opendata.frames import time_columns
 
 from conftest import synthetic_frame
 from flex_ramps import analysis, cli
@@ -53,21 +56,17 @@ def test_report_and_dashboard(result, tmp_path):
 
 
 def test_cli_offline_end_to_end(tmp_path):
-    """Synthetic cache files in the layout of the real cache; no network is touched (--offline)."""
-    api_dir, legacy_dir = tmp_path / "data" / "api", tmp_path / "data" / "legacy"
-    api_dir.mkdir(parents=True)
-    legacy_dir.mkdir(parents=True)
+    """Synthetic pse-opendata cache files (the layout of the real cache); no network is touched (--offline)."""
+    cache = MonthCache(tmp_path / "data")
     old = synthetic_frame("2024-06-01", "2024-06-14", freq="1h")
-    pd.DataFrame({"demand": old["demand"], "jwcd": old["conv"], "njwcd": old["pv"] + old["wind"],
-                  "swm_p": old["net_import"], "swm_np": 0.0}).to_parquet(legacy_dir / "PL_WYK_KSE_2024-06.parquet")
-    old[["wind", "pv"]].to_parquet(legacy_dir / "PL_GEN_WIATR_2024-06.parquet")
+    write_months(cache, "legacy", "PL_WYK_KSE", old, get_legacy_report("PL_WYK_KSE").field_names, "1h",
+                 {"demand": old["demand"], "jwcd": old["conv"], "njwcd": old["pv"] + old["wind"],
+                  "swm_p": old["net_import"], "swm_np": 0.0})
+    write_months(cache, "legacy", "PL_GEN_WIATR", old, ["wind", "pv"], "1h", {"wind": old["wind"], "pv": old["pv"]})
     new = synthetic_frame("2024-06-14", "2024-09-01")
-    api = pd.DataFrame({"demand": new["demand"], "pv": new["pv"], "wind": new["wind"],
-                        "jg": new["conv"], "jnwrb": new["pv"] + new["wind"], "swm_p": new["net_import"],
-                        "swm_np": 0.0})
-    api["business_date"] = new.index.tz_convert("Europe/Warsaw").date
-    for label, part in api.groupby(new.index.tz_convert("Europe/Warsaw").strftime("%Y-%m")):
-        part.to_parquet(api_dir / f"mix_{label}.parquet")
+    write_months(cache, "api", "his-wlk-cal", new, get_report("his-wlk-cal").field_names, "15min",
+                 {"demand": new["demand"], "pv": new["pv"], "wi": new["wind"], "jg": new["conv"],
+                  "jnwrb": new["pv"] + new["wind"], "swm_p": new["net_import"], "swm_np": 0.0})
     args = ["--data-dir", str(tmp_path / "data"), "--offline", "--today", "2024-08-31", "--legacy-start",
             "2024-06-01", "--base-year", "2024"]
     assert cli.main(["report", *args, "--results", str(tmp_path / "results"), "--no-figures"]) == 0
@@ -76,5 +75,19 @@ def test_cli_offline_end_to_end(tmp_path):
     assert cli.main(["dashboard", *args, "--out", str(tmp_path / "docs")]) == 0
     assert (tmp_path / "docs" / "index.html").exists()
     # a missing legacy month stops the run unless gaps are allowed
-    (legacy_dir / "PL_GEN_WIATR_2024-06.parquet").unlink()
+    cache.path("legacy", "PL_GEN_WIATR", date(2024, 6, 1)).unlink()
     assert cli.main(["report", *args, "--results", str(tmp_path / "r2"), "--no-figures"]) == 2
+
+
+def write_months(cache: MonthCache, source: str, name: str, frame: pd.DataFrame, fields: list[str], step: str,
+                 values: dict) -> None:
+    """Store ``values`` on the index of ``frame`` (interval starts, UTC) as monthly pse-opendata cache files."""
+    out = time_columns(frame.index, pd.Timedelta(step))
+    for f in fields:
+        v = values.get(f, np.nan)
+        out[f] = v.to_numpy() if isinstance(v, pd.Series) else v
+    months = pd.Series([d.replace(day=1) for d in out["business_date"]])
+    for first, part in out.groupby(months.to_numpy()):
+        last = (pd.Timestamp(first) + pd.offsets.MonthEnd(0)).date()
+        cache.write(source, name, first, part.reset_index(drop=True), fetched_utc=pd.Timestamp("2026-01-01", tz="UTC"),
+                    first_day=first, last_day=last)

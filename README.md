@@ -315,11 +315,12 @@ operator), downloaded without a key:
 | legacy CSV export `https://www.pse.pl/getcsv/-/export/csv/<report>/data_od/<from>/data_do/<to>` | `PL_WYK_KSE`: national demand, generation of JWCD and nJWCD units, exchange balances | hourly, until 13 Jun 2024 | |
 | | `PL_GEN_WIATR`: generation of wind and PV sources | hourly, PV from 2020 | |
 
-In the API `dtime_utc` is the **end** of each 15-minute interval; the code converts it to the interval start.
-Requests use `$filter` on `business_date`, `$first=20000` and follow `nextLink`. The legacy export serves local
-dates and hours 1-24 (the extra autumn hour is `2A`); it is requested one month at a time with a pause, because the
-server answers HTTP 429 to quick series of requests. The download is about 7.5 MB and is cached as monthly Parquet
-files in `data/`, which is not part of the repository.
+Both sources are read with [pse-opendata](https://pypi.org/project/pse-opendata/). In the API `dtime_utc` is the
+**end** of each 15-minute interval; the library converts it to the interval start. The legacy export serves local
+dates and hours 1-24 (the spring day has no hour 2, the extra autumn hour is `2A`); every row is placed by its hour
+label, and the export is requested one month at a time with a pause, because the server answers HTTP 429 to quick
+series of requests. The download is about 7.5 MB and is cached as monthly Parquet files in `data/`, which is not part
+of the repository.
 
 **Terms of use.** PSE publishes conditions for re-using public sector information
 ([www.pse.pl, BIP, "Ponowne wykorzystywanie informacji sektora publicznego"](https://www.pse.pl/bip/ponowne-wykorzystanie-informacji-publicznej),
@@ -353,8 +354,8 @@ pytest -q                                             # synthetic data, no netwo
 
 ```
 src/flex_ramps/
-  pse_api.py      PSE reports API client (his-wlk-cal) with monthly Parquet cache
-  pse_legacy.py   legacy CSV export client (PL_WYK_KSE, PL_GEN_WIATR), hourly history
+  pse_api.py      his-wlk-cal through pse-opendata, data status
+  pse_legacy.py   legacy CSV export through pse-opendata (PL_WYK_KSE, PL_GEN_WIATR), hourly history
   data.py         15-minute and hourly analysis frames
   ramps.py        residual load, ramps, duration curves, sunset, evening ramp, midday minima
   rts.py          IEEE RTS fleet, merit-order dispatch, IRRE, LOLE

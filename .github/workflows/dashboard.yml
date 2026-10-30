@@ -42,8 +42,8 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: data
-          key: pse-data-${{ github.run_id }}
-          restore-keys: pse-data-
+          key: pse-opendata-${{ github.run_id }}
+          restore-keys: pse-opendata-
 
       # exits with code 2 when the API series or months of the legacy history are missing; then nothing is
       # deployed, the previously published page stays online and the next run resumes the download
@@ -55,7 +55,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: data
-          key: pse-data-${{ github.run_id }}
+          key: pse-opendata-${{ github.run_id }}
 
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3

@@ -7,8 +7,9 @@ Usage:
     python -m flex_ramps report --offline --today 2026-10-21   # rebuild from the cache with a fixed "today"
     python -m flex_ramps report --base-year 2025        # reference year of the 15-minute, IRRE and storage analysis
 
-Data are cached as monthly Parquet files in ./data (override with --data-dir or FLEX_DATA_DIR): data/api for the
-reports API (recent months are downloaded again), data/legacy for the legacy CSV export (final, never refreshed).
+Data are read with pse-opendata and cached as monthly Parquet files in ./data (override with --data-dir or
+FLEX_DATA_DIR): data/api for the reports API (a month is downloaded again until the 60-day revision window has
+passed), data/legacy for the legacy CSV export (final, never refreshed).
 Exit code 2 means that the API series, or months of the hourly history, were missing, so nothing was written.
 """
 from __future__ import annotations
@@ -37,12 +38,11 @@ def _date(s: str) -> date:
 
 
 def load_data(args, today: date):
-    api, api_status = load_mix(API_START, today + timedelta(days=1), args.data_dir / "api", today=today,
-                               offline=args.offline)
+    api, api_status = load_mix(API_START, today + timedelta(days=1), args.data_dir, offline=args.offline)
     log.info("API: %d intervals, last %s, fetched %d, cached %d, stale %s, missing %s", len(api),
              api_status.last_interval, len(api_status.fetched), len(api_status.cached), api_status.stale,
              api_status.missing)
-    legacy, legacy_status = load_legacy(args.legacy_start, args.data_dir / "legacy", offline=args.offline,
+    legacy, legacy_status = load_legacy(args.legacy_start, args.data_dir, offline=args.offline,
                                         pause_s=args.legacy_pause)
     log.info("legacy: %d hours, fetched %d, cached %d, missing %s", len(legacy), len(legacy_status.fetched),
              len(legacy_status.cached), legacy_status.missing)
@@ -51,7 +51,7 @@ def load_data(args, today: date):
 
 def _downloaded(args) -> str:
     """Date the PSE data were obtained: today, or the newest cache file when running offline."""
-    files = list(args.data_dir.glob("*/*.parquet"))
+    files = list(args.data_dir.rglob("*.parquet"))
     if args.offline and files:
         return f"{datetime.fromtimestamp(max(f.stat().st_mtime for f in files)):%Y-%m-%d}"
     return f"{date.today():%Y-%m-%d}"
