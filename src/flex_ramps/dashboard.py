@@ -499,7 +499,8 @@ function render() {
       paper_bgcolor: t.surface, plot_bgcolor: t.surface,
       font: { family: 'system-ui, -apple-system, "Segoe UI", sans-serif', color: t.ink, size: 12 },
       margin: { l: 56, r: 16, t: 8, b: 40 },
-      legend: { orientation: "h", y: -0.2, font: { color: t.ink2 } },
+      // below the x-axis title (at -0.2 a wide legend met the title)
+      legend: Object.assign({ orientation: "h", y: -0.3 }, lay.legend || {}, { font: { color: t.ink2 } }),
       hoverlabel: { bgcolor: t.surface, bordercolor: t.axis, font: { color: t.ink } },
       xaxis: axis(t, lay.xaxis), yaxis: axis(t, lay.yaxis),
     });
