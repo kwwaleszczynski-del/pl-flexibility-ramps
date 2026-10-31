@@ -94,7 +94,11 @@ D_{t,i} = \left(\mathrm{NL}_{t+i} - \mathrm{NL}_t\right) - \sum_r F_{t,i,r} - F^
   power found below, scaled by $`s`$, assumed available at all times (the paper's assumption for storage).
 
 For comparison the loss of load expectation of the same fleet is computed from an exact capacity outage
-probability table (the code reproduces the RTS-79 reference value of 9.394 h/year with the RTS-79 load model).
+probability table (the code reproduces the RTS-79 reference value of 9.394 h/year with the RTS-79 load model). The
+same RTS-79 fleet and capacity outage table drive the adequacy study
+[pl-res-reliability-markov](https://github.com/kwwaleszczynski-del/pl-res-reliability-markov) (Markov weather
+models, sequential Monte Carlo, ELCC of wind, PV and storage), which asks the adequacy question this project sets
+against flexibility.
 
 **How much storage.** For each day of the reference year a linear programme (HiGHS via SciPy) finds the smallest
 storage power and, at that power, the smallest energy that keep all 15-minute, 1-hour and 3-hour ramps of the
@@ -181,7 +185,8 @@ combined heat and power, set a floor that the midday residual load now regularly
 ![midday minimum](docs/img/midday_minimum.png)
 
 With 50% more PV the 2025 residual load would fall below zero in 317 quarter-hours (to -3.9 GW) and the midday
-minimum would drop below 5 GW on 180 days instead of 37.
+minimum would drop below 5 GW on 180 days instead of 37. Both counts are on 15-minute data, where a short dip below
+5 GW counts; on hourly means, as in the table above, 2025 has 34 such days.
 
 ![duration curves](docs/img/duration_curves.png)
 
