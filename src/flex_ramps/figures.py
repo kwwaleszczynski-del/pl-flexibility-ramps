@@ -15,6 +15,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
+from matplotlib.lines import Line2D  # noqa: E402
 import pandas as pd  # noqa: E402
 
 from flex_ramps.analysis import Analysis, PV_SCALES  # noqa: E402
@@ -85,7 +86,7 @@ def fig_duration(r: Analysis, path: Path) -> Path:
     colours = highlight_years(full)
     for y in full:
         c = colours[y]
-        a1.plot(d.index, d[y] / 1000, color=c, linewidth=2.0 if c != OLD else 1.2, label=y if c != OLD else None)
+        a1.plot(d.index, d[y] / 1000, color=c, linewidth=2.0 if c != OLD else 1.2, label=y)  # grey years too
     a1.set_title("Residual-load duration curves, full years", color=INK, fontsize=10.5, loc="left")
     by = str(r.base_year)
     cols = [by] + [c for c in d.columns if c.startswith(f"{by} PV")]
@@ -119,9 +120,12 @@ def fig_distributions(r: Analysis, path: Path) -> Path:
         _style(ax, "% of intervals" if horizon == "15min" else None)
         ax.set_xlabel(f"{horizon} change of residual load, GW", color=INK2, fontsize=9)
         ax.set_title(f"{horizon} ramps", color=INK, fontsize=10.5, loc="left")
-    _legend(axes[0], loc="upper left")
-    axes[2].text(0.98, 0.95, "dotted: P1 and P99", transform=axes[2].transAxes, ha="right", va="top",
-                 color=MUTED, fontsize=8)
+    # one legend below the panels (inside, the dotted percentile lines crossed it); the lines get their own entry
+    handles, labels = axes[0].get_legend_handles_labels()
+    handles.append(Line2D([], [], color=MUTED, linewidth=0.9, linestyle=":"))
+    labels.append("P1 and P99 (dotted)")
+    axes[1].legend(handles, labels, loc="upper center", bbox_to_anchor=(0.5, -0.2), ncol=3, frameon=False,
+                   fontsize=8, labelcolor=INK2, columnspacing=1.0, handlelength=1.5, handletextpad=0.5)
     return _save(fig, path)
 
 
@@ -140,7 +144,7 @@ def fig_trend(r: Analysis, path: Path) -> Path:
         ax.plot(x, up.rolling(12, min_periods=12).mean(), color=SERIES[0], linewidth=2.2, label="upward (P99)")
         ax.plot(x, down.rolling(12, min_periods=12).mean(), color=SERIES[1], linewidth=2.2,
                 label="downward (|P1|)")
-        _style(ax, "GW" if horizon == "1h" else None)
+        _style(ax, "GW")
         ax.set_title(f"{horizon[:-1]}-hour ramps, monthly P99 and |P1| (thick: 12-month mean)", color=INK,
                      fontsize=10.5,
                      loc="left")
@@ -208,6 +212,7 @@ def fig_irre(r: Analysis, path: Path) -> Path:
             a2.text(xx, v, f"{v:.1f}", ha="center", va="bottom", color=INK2, fontsize=7.5)
     a2.set_xticks(range(len(variants)), ["RTS-96 data", "nuclear\nmust-run", "+ storage"])
     _style(a2, None, grid="y")
+    a2.set_ylim(0, 1.3 * float(c[c["horizon_h"] == h]["irre_pct"].max()))  # headroom: legend above the labels
     a2.set_title(f"IRRE at the {h:.0f}-hour horizon by fleet variant", color=INK, fontsize=10.5, loc="left")
     _legend(a2, loc="upper left")
     return _save(fig, path)
